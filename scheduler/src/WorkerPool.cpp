@@ -7,6 +7,10 @@
 
 namespace forge {
 
+namespace {
+constexpr int MAX_ATTEMPTS = 3;
+}
+
 WorkerPool::WorkerPool(
     std::size_t workerCount,
     std::chrono::milliseconds jobDuration,
@@ -59,6 +63,7 @@ WorkerPool::WorkerPool(
 }
 
 void WorkerPool::submit(std::shared_ptr<Job> job) {
+
     if (!job) {
         throw std::invalid_argument(
             "Cannot submit a null job"
@@ -82,7 +87,9 @@ void WorkerPool::submit(std::shared_ptr<Job> job) {
 }
 
 void WorkerPool::workerLoop(std::size_t workerId) {
+
     while (true) {
+
         std::shared_ptr<Job> job;
 
         {
@@ -103,14 +110,15 @@ void WorkerPool::workerLoop(std::size_t workerId) {
             continue;
         }
 
-        constexpr int maxAttempts = 3;
-
         bool completed = false;
 
         const auto startTime =
             std::chrono::steady_clock::now();
 
-        for (int attempt = 1; attempt <= maxAttempts; ++attempt) {
+        for (int attempt = 1;
+             attempt <= MAX_ATTEMPTS;
+             ++attempt) {
+
             statistics.recordAttempt();
 
             if (attempt > 1) {
@@ -127,16 +135,29 @@ void WorkerPool::workerLoop(std::size_t workerId) {
             }
 
             try {
+
                 std::this_thread::sleep_for(
                     simulatedJobDuration
                 );
 
+                // Temporary failure: ID 103.
+                // Succeeds on the third attempt.
                 if (simulateFailures &&
                     job->getId() == 103 &&
-                    attempt < 3) {
+                    attempt < MAX_ATTEMPTS) {
 
                     throw std::runtime_error(
                         "Temporary payment service error"
+                    );
+                }
+
+                // Permanent failure: other IDs divisible by 103.
+                if (simulateFailures &&
+                    job->getId() != 103 &&
+                    job->getId() % 103 == 0) {
+
+                    throw std::runtime_error(
+                        "Simulated permanent job failure"
                     );
                 }
 
@@ -152,14 +173,17 @@ void WorkerPool::workerLoop(std::size_t workerId) {
                 break;
             }
             catch (const std::exception& error) {
+
                 if (verbose) {
                     std::osyncstream(std::cout)
                         << "Job " << job->getId()
-                        << " failed on attempt " << attempt
-                        << ": " << error.what() << '\n';
+                        << " failed on attempt "
+                        << attempt << ": "
+                        << error.what() << '\n';
                 }
             }
             catch (...) {
+
                 if (verbose) {
                     std::osyncstream(std::cout)
                         << "Job " << job->getId()
@@ -178,8 +202,11 @@ void WorkerPool::workerLoop(std::size_t workerId) {
             );
 
         if (completed) {
+
             statistics.recordCompletion(duration);
+
         } else {
+
             job->setStatus(JobStatus::FAILED);
 
             statistics.recordFailure(duration);
@@ -188,25 +215,29 @@ void WorkerPool::workerLoop(std::size_t workerId) {
                 std::osyncstream(std::cout)
                     << "Job " << job->getId()
                     << " permanently FAILED after "
-                    << maxAttempts << " attempts.\n";
+                    << MAX_ATTEMPTS << " attempts.\n";
             }
         }
     }
 }
 
 void WorkerPool::shutdown() {
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-        stopping = true;
-    }
 
-    condition.notify_all();
+    std::call_once(shutdownOnce, [this] {
 
-    for (auto& worker : workers) {
-        if (worker.joinable()) {
-            worker.join();
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            stopping = true;
         }
-    }
+
+        condition.notify_all();
+
+        for (auto& worker : workers) {
+            if (worker.joinable()) {
+                worker.join();
+            }
+        }
+    });
 }
 
 const JobStatistics& WorkerPool::getStatistics() const {

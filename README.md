@@ -1,21 +1,25 @@
 # FORGE
+
 ### A Concurrent Priority-Based Job Scheduling Engine in Modern C++
 
 FORGE is a C++20 job scheduling engine designed to execute prioritized workloads concurrently using a configurable worker thread pool.
 
-It features priority-based scheduling, FIFO ordering for equal-priority jobs, automatic retry handling, thread-safe job statistics, and graceful worker shutdown.
+It features priority-based scheduling, FIFO ordering for equal-priority jobs, automatic retry handling, thread-safe job statistics, graceful worker shutdown, and concurrent job submission.
 
-The project explores modern C++ concurrency, synchronization, scheduling algorithms, and performance engineering.
+The project explores modern C++ concurrency, synchronization, scheduling algorithms, reliability engineering, and performance analysis.
 
 ## Key Features
 
 - **Priority-Based Scheduling:** Higher-priority jobs are selected before lower-priority jobs.
 - **Concurrent Execution:** Configurable worker threads process jobs concurrently.
-- **FIFO Tie-Breaking:** Jobs with equal priority preserve submission order in the queue.
+- **FIFO Tie-Breaking:** Jobs with equal priority preserve submission order.
 - **Retry Mechanism:** Failed jobs can be retried up to three attempts.
 - **Thread Safety:** Uses mutexes, condition variables, and atomic operations.
 - **Graceful Shutdown:** Workers finish queued jobs before the pool shuts down.
+- **Concurrent Shutdown:** Multiple shutdown requests are safely coordinated.
 - **Execution Statistics:** Tracks submitted jobs, completions, failures, attempts, and execution durations.
+- **Reliability Testing:** Covers invalid inputs, retry exhaustion, concurrent submissions, and worker lifecycle.
+- **Stress Testing:** Successfully processed 100,000 jobs using eight producer threads and eight worker threads.
 - **Performance Benchmarking:** Measures execution time, throughput, speedup, and efficiency.
 
 ## Architecture
@@ -34,8 +38,8 @@ The project explores modern C++ concurrency, synchronization, scheduling algorit
                        v
                 +-------------+
                 |   JobQueue  |
-                |  Priority   |
-                | Scheduling  |
+                |   Priority  |
+                |  Scheduling |
                 +-------------+
                        |
               +--------+--------+
@@ -48,10 +52,10 @@ The project explores modern C++ concurrency, synchronization, scheduling algorit
                        v
                  Job Execution
                        |
-                 +-----+-----+
-                 |           |
-                 v           v
-             Job Status  JobStatistics
+                +------+------+
+                |             |
+                v             v
+            Job Status   JobStatistics
 ```
 
 ## Technology Stack
@@ -62,7 +66,7 @@ The project explores modern C++ concurrency, synchronization, scheduling algorit
 | `std::thread` | Concurrent worker execution |
 | `std::mutex` | Shared resource synchronization |
 | `std::condition_variable` | Worker coordination |
-| `std::atomic` | Thread-safe status and counters |
+| `std::atomic` | Thread-safe counters |
 | `std::priority_queue` | Priority-based scheduling |
 | `std::shared_ptr` | Shared job ownership |
 | `std::chrono` | Execution-time measurement |
@@ -72,39 +76,44 @@ The project explores modern C++ concurrency, synchronization, scheduling algorit
 
 ```text
 FORGE/
-│
-├── benchmarks/
-│   └── worker_pool_benchmark.cpp
-│
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── BENCHMARKS.md
-│   ├── DESIGN_DECISIONS.md
-│   ├── FORGE_ENGINEERING_NOTEBOOK.md
-│   ├── IMPLEMENTATION_LOG.md
-│   └── TESTING.md
-│
-├── scheduler/
-│   ├── include/
-│   │   ├── Job.h
-│   │   ├── JobQueue.h
-│   │   ├── JobStatistics.h
-│   │   └── WorkerPool.h
-│   │
-│   └── src/
-│       ├── job.cpp
-│       ├── JobQueue.cpp
-│       ├── JobStatistics.cpp
-│       ├── main.cpp
-│       └── WorkerPool.cpp
-│
-├── tests/
-│   ├── priority_queue_test.cpp
-│   └── worker_pool_test.cpp
-│
-├── .gitignore
-├── LICENSE
-└── README.md
+|
++-- benchmarks/
+|   +-- worker_pool_benchmark.cpp
+|
++-- docs/
+|   +-- ARCHITECTURE.md
+|   +-- BENCHMARKS.md
+|   +-- DESIGN_DECISIONS.md
+|   +-- FORGE_ENGINEERING_NOTEBOOK.md
+|   +-- IMPLEMENTATION_LOG.md
+|   +-- TESTING.md
+|
++-- scheduler/
+|   +-- include/
+|   |   +-- Job.h
+|   |   +-- JobQueue.h
+|   |   +-- JobStatistics.h
+|   |   +-- WorkerPool.h
+|   |
+|   +-- src/
+|       +-- job.cpp
+|       +-- JobQueue.cpp
+|       +-- JobStatistics.cpp
+|       +-- main.cpp
+|       +-- WorkerPool.cpp
+|
++-- tests/
+|   +-- priority_queue_test.cpp
+|   +-- worker_pool_test.cpp
+|   +-- reliability_test.cpp
+|   +-- retry_exhaustion_test.cpp
+|   +-- concurrent_submission_test.cpp
+|   +-- worker_lifecycle_test.cpp
+|   +-- stress_test.cpp
+|
++-- .gitignore
++-- LICENSE
++-- README.md
 ```
 
 ## Build and Run
@@ -117,7 +126,7 @@ FORGE/
 ### Compile
 
 ```bash
-g++ -std=c++20 -Wall -Wextra -Wpedantic -pthread -Ischeduler/include scheduler/src/main.cpp scheduler/src/job.cpp scheduler/src/JobQueue.cpp scheduler/src/WorkerPool.cpp scheduler/src/JobStatistics.cpp -o forge
+g++ -std=c++20 -Wall -Wextra -Wpedantic -pthread -Ischeduler/include scheduler/src/main.cpp scheduler/src/job.cpp scheduler/src/JobQueue.cpp scheduler/src/JobStatistics.cpp scheduler/src/WorkerPool.cpp -o forge
 ```
 
 ### Run
@@ -151,31 +160,53 @@ The benchmark uses simulated waiting tasks. These measurements demonstrate concu
 
 See [BENCHMARKS.md](docs/BENCHMARKS.md) for details.
 
-## Testing
+## Reliability and Testing
 
-FORGE currently includes two automated test programs.
+FORGE includes seven test programs covering scheduling, execution, reliability, and concurrency.
 
-**Priority queue tests**
-- Priority ordering.
-- FIFO ordering for equal priorities.
-- Empty queue behavior.
+| Test | Coverage |
+|---|---|
+| `priority_queue_test.cpp` | Priority ordering, FIFO tie-breaking, empty queue |
+| `worker_pool_test.cpp` | Worker execution and graceful shutdown |
+| `reliability_test.cpp` | Zero workers, null jobs, submission after shutdown |
+| `retry_exhaustion_test.cpp` | Retry exhaustion and failed job status |
+| `concurrent_submission_test.cpp` | 10,000 jobs submitted by concurrent producers |
+| `worker_lifecycle_test.cpp` | Repeated shutdown, concurrent shutdown, destructor shutdown |
+| `stress_test.cpp` | 100,000 jobs with eight producers and eight workers |
 
-**Worker pool tests**
-- Worker execution.
-- Graceful shutdown.
+### Stress Test Results
 
-Run the commands documented in [TESTING.md](docs/TESTING.md).
+The 100,000-job stress test completed successfully.
+
+| Metric | Result |
+|---|---:|
+| Producer threads | 8 |
+| Worker threads | 8 |
+| Jobs submitted | 100,000 |
+| Jobs completed | 100,000 |
+| Jobs failed | 0 |
+| Total attempts | 100,000 |
+| Retry attempts | 0 |
+| Lost or incomplete jobs | 0 |
+
+**Result:** All 100,000 jobs completed, and all statistics were verified successfully.
+
+All seven test programs have passed their respective test runs.
+
+See [TESTING.md](docs/TESTING.md) for compilation and execution instructions.
 
 ## Engineering Concepts Demonstrated
 
-- Multithreaded programming in C++.
+- Multithreaded programming in modern C++.
 - Thread synchronization and mutual exclusion.
 - Condition-variable-based worker coordination.
-- Atomic operations and memory ordering.
+- Atomic operations.
 - Heap-based priority scheduling.
 - Shared ownership and RAII.
 - Retry and failure handling.
-- Performance benchmarking and throughput analysis.
+- Graceful worker lifecycle management.
+- Concurrent producer workloads.
+- Stress testing and performance analysis.
 
 ## Future Improvements
 
@@ -186,7 +217,8 @@ Run the commands documented in [TESTING.md](docs/TESTING.md).
 - Persistent job storage.
 - Distributed job execution.
 - CPU-intensive performance benchmarks.
-- Expanded concurrency and stress testing.
+- Advanced scheduling policies.
+- Monitoring and observability.
 
 ## Documentation
 
@@ -199,7 +231,7 @@ Run the commands documented in [TESTING.md](docs/TESTING.md).
 
 ## Author
 
-Developed as a systems programming project to explore modern C++, concurrent execution, and job scheduling architecture.
+Developed as a systems programming project to explore modern C++, concurrent execution, reliability engineering, and job scheduling architecture.
 
 ---
 

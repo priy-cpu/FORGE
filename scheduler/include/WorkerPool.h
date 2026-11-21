@@ -25,9 +25,14 @@ private:
     bool verbose;
 
     std::vector<std::thread> workers;
+
     std::mutex mutex;
     std::condition_variable condition;
+
     bool stopping = false;
+
+    // Ensures shutdown and worker joining happen only once.
+    std::once_flag shutdownOnce;
 
     void workerLoop(std::size_t workerId);
 
