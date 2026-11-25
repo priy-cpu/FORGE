@@ -110,9 +110,11 @@ FORGE/
 |   +-- concurrent_submission_test.cpp
 |   +-- worker_lifecycle_test.cpp
 |   +-- stress_test.cpp
-|
 +-- .gitignore
 +-- LICENSE
++-- Dockerfile
++-- Dockerfile.prod
++-- compose.yaml
 +-- README.md
 ```
 
@@ -141,7 +143,84 @@ Linux:
 
 ```bash
 ./forge
+
 ```
+
+
+
+## Docker and Containerization
+
+FORGE supports containerized development, testing, and production execution using Docker.
+
+### Docker Images
+
+The project uses two Docker images:
+
+| Image | Purpose |
+|---|---|
+| `forge:phase3` | Development image containing the application and seven test executables |
+| `forge:production` | Lightweight production image containing only the compiled application |
+
+### Build Development Image
+
+```bash
+docker build -t forge:phase3 .
+```
+
+### Run All Tests Inside Docker
+
+```bash
+docker run --rm forge:phase3 sh -c "./priority_test && ./worker_test && ./reliability_test && ./retry_exhaustion_test && ./concurrent_submission_test && ./worker_lifecycle_test && ./stress_test"
+```
+
+All seven test programs passed inside the Linux container, including the 100,000-job stress test.
+
+### Build Production Image
+
+```bash
+docker build -f Dockerfile.prod -t forge:production .
+```
+
+### Run Production Container
+
+```bash
+docker run --rm forge:production
+```
+
+### Docker Compose
+
+Build and start FORGE using Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Stop and remove the container and network:
+
+```bash
+docker compose down
+```
+
+### Multi-Stage Build Optimization
+
+The production image uses a multi-stage Docker build:
+
+- Builder stage: GCC 14 compiles the C++20 application.
+- Runtime stage: Debian 13 Slim contains only the compiled executable and runtime dependencies.
+
+| Image | Reported Disk Usage |
+|---|---:|
+| Development image | 2.14 GB |
+| Production image | 118 MB |
+
+**Result:** Approximately 94.5% reduction in reported image disk usage.
+
+The production container was successfully executed, and all six demonstration jobs completed with zero failures.
+
+Docker validation was performed on Docker Desktop using Linux containers.
+
+
+
 
 ## Performance Benchmark
 

@@ -1,0 +1,9 @@
+
+services:
+  forge:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    image: forge:production
+    container_name: forge-scheduler
+    restart: "no"

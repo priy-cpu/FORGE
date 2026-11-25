@@ -1,0 +1,25 @@
+
+# Stage 1: Build FORGE
+FROM gcc:14 AS builder
+
+WORKDIR /app
+
+COPY scheduler/ scheduler/
+
+RUN g++ -std=c++20 -Wall -Wextra -Wpedantic -pthread \
+    -Ischeduler/include \
+    scheduler/src/main.cpp \
+    scheduler/src/job.cpp \
+    scheduler/src/JobQueue.cpp \
+    scheduler/src/JobStatistics.cpp \
+    scheduler/src/WorkerPool.cpp \
+    -o forge
+
+# Stage 2: Lightweight production image
+FROM debian:trixie-slim AS runtime
+
+WORKDIR /app
+
+COPY --from=builder /app/forge ./forge
+
+CMD ["./forge"]
